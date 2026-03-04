@@ -19,6 +19,8 @@ interface AgentDispatchConfig {
   metadata?: string;
 }
 
+type PromptProfile = 'main' | 'dynamic';
+
 /**
  * Get the app configuration
  * @param headers - The headers of the request
@@ -95,19 +97,29 @@ export function getStyles(appConfig: AppConfig) {
     .join('\n');
 }
 
-function buildRoomConfig(appConfig: AppConfig, resume: string, agentName?: string) {
+function buildRoomConfig(
+  appConfig: AppConfig,
+  resume: string,
+  agentName?: string,
+  promptProfile: PromptProfile = 'main'
+) {
   const dispatchAgentName = agentName ?? appConfig.agentName;
   if (!dispatchAgentName) {
     return undefined;
   }
 
+  const trimmedResume = resume.trim();
+  const metadata: Record<string, string> = {
+    prompt_profile: promptProfile,
+  };
+  if (trimmedResume) {
+    metadata.resume = trimmedResume;
+  }
+
   const agentDispatch: AgentDispatchConfig = {
     agent_name: dispatchAgentName,
+    metadata: JSON.stringify(metadata),
   };
-  const trimmedResume = resume.trim();
-  if (trimmedResume) {
-    agentDispatch.metadata = JSON.stringify({ resume: trimmedResume });
-  }
 
   return {
     agents: [agentDispatch],
@@ -141,11 +153,16 @@ async function fetchConnectionDetails(
  * @param appConfig - The app configuration
  * @returns A token source for a sandboxed LiveKit session
  */
-export function getSandboxTokenSource(appConfig: AppConfig, resume: string, agentName?: string) {
+export function getSandboxTokenSource(
+  appConfig: AppConfig,
+  resume: string,
+  agentName?: string,
+  promptProfile: PromptProfile = 'main'
+) {
   return TokenSource.custom(async () => {
     const url = new URL(process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT!, window.location.origin);
     const sandboxId = appConfig.sandboxId ?? '';
-    const roomConfig = buildRoomConfig(appConfig, resume, agentName);
+    const roomConfig = buildRoomConfig(appConfig, resume, agentName, promptProfile);
 
     try {
       return await fetchConnectionDetails(
@@ -160,9 +177,14 @@ export function getSandboxTokenSource(appConfig: AppConfig, resume: string, agen
   });
 }
 
-export function getEndpointTokenSource(appConfig: AppConfig, resume: string, agentName?: string) {
+export function getEndpointTokenSource(
+  appConfig: AppConfig,
+  resume: string,
+  agentName?: string,
+  promptProfile: PromptProfile = 'main'
+) {
   return TokenSource.custom(async () => {
-    const roomConfig = buildRoomConfig(appConfig, resume, agentName);
+    const roomConfig = buildRoomConfig(appConfig, resume, agentName, promptProfile);
     try {
       return await fetchConnectionDetails('/api/token', {}, roomConfig);
     } catch (error) {

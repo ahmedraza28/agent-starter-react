@@ -27,20 +27,22 @@ interface AppProps {
 
 export function App({ appConfig }: AppProps) {
   const [resume, setResume] = useState('');
-  const defaultAgentName =
+  const dispatchAgentName =
     process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? appConfig.agentName ?? 'my-agent';
+  const defaultAgentName = process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? dispatchAgentName;
   const dynamicAgentName = process.env.NEXT_PUBLIC_DYNAMIC_AGENT_NAME ?? 'dynamic-agent';
   const [selectedAgentName, setSelectedAgentName] = useState(defaultAgentName);
+  const selectedPromptProfile = selectedAgentName === dynamicAgentName ? 'dynamic' : 'main';
 
   const tokenSource = useMemo(() => {
     return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
-      ? getSandboxTokenSource(appConfig, resume, selectedAgentName)
-      : getEndpointTokenSource(appConfig, resume, selectedAgentName);
-  }, [appConfig, resume, selectedAgentName]);
+      ? getSandboxTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile)
+      : getEndpointTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile);
+  }, [appConfig, resume, dispatchAgentName, selectedPromptProfile]);
 
   const session = useSession(
     tokenSource,
-    selectedAgentName ? { agentName: selectedAgentName } : undefined
+    dispatchAgentName ? { agentName: dispatchAgentName } : undefined
   );
 
   return (
