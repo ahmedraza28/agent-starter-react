@@ -1,3 +1,4 @@
+import { useState, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -30,6 +31,8 @@ interface WelcomeViewProps {
   onStartCall: () => void;
   resume: string;
   onResumeChange: (resume: string) => void;
+  resumeInputMode: 'text' | 'pdf';
+  onResumeInputModeChange: (mode: 'text' | 'pdf') => void;
   selectedAgentName: string;
   onSelectedAgentNameChange: (agentName: string) => void;
   defaultAgentName: string;
@@ -41,12 +44,76 @@ export const WelcomeView = ({
   onStartCall,
   resume,
   onResumeChange,
+  resumeInputMode,
+  onResumeInputModeChange,
   selectedAgentName,
   onSelectedAgentNameChange,
   defaultAgentName,
   dynamicAgentName,
   ref,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState('');
+  const [pdfError, setPdfError] = useState('');
+
+  const handlePdfFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      setPdfError('Please upload a valid PDF file.');
+      return;
+    }
+
+    setPdfError('');
+    setIsParsingPdf(true);
+    setPdfFileName(file.name);
+
+    try {
+      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/build/pdf.worker.min.mjs',
+        import.meta.url
+      ).toString();
+
+      const data = new Uint8Array(await file.arrayBuffer());
+      const loadingTask = pdfjs.getDocument({ data });
+      const pdf = await loadingTask.promise;
+      const pageTexts: string[] = [];
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const text = content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ')
+          .trim();
+
+        if (text) {
+          pageTexts.push(text);
+        }
+      }
+
+      const extractedResume = pageTexts.join('\n\n').trim();
+      if (!extractedResume) {
+        throw new Error('No readable text was found in this PDF.');
+      }
+
+      onResumeChange(extractedResume);
+    } catch (error) {
+      console.error('PDF parsing failed:', error);
+      setPdfError(
+        error instanceof Error ? error.message : 'Failed to parse this PDF. Try another file.'
+      );
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
   return (
     <div ref={ref}>
       <section className="bg-background flex flex-col items-center justify-center text-center">
@@ -69,17 +136,64 @@ export const WelcomeView = ({
           </Select>
         </div>
 
-        <textarea
-          value={resume}
-          onChange={(event) => onResumeChange(event.target.value)}
-          placeholder="Paste candidate resume here..."
-          className="border-input bg-background text-foreground mt-6 h-36 w-full max-w-2xl rounded-xl border p-3 text-left text-sm focus:outline-none"
-        />
+        <div className="mt-6 w-full max-w-2xl text-left">
+          <label className="text-foreground mb-2 block text-sm font-medium">Resume input</label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={resumeInputMode === 'text' ? 'default' : 'outline'}
+              onClick={() => onResumeInputModeChange('text')}
+            >
+              Paste Text
+            </Button>
+            <Button
+              type="button"
+              variant={resumeInputMode === 'pdf' ? 'default' : 'outline'}
+              onClick={() => onResumeInputModeChange('pdf')}
+            >
+              Upload PDF
+            </Button>
+          </div>
+        </div>
+
+        {resumeInputMode === 'text' ? (
+          <textarea
+            value={resume}
+            onChange={(event) => onResumeChange(event.target.value)}
+            placeholder="Paste candidate resume here..."
+            className="border-input bg-background text-foreground mt-4 h-36 w-full max-w-2xl rounded-xl border p-3 text-left text-sm focus:outline-none"
+          />
+        ) : (
+          <div className="border-input bg-background mt-4 w-full max-w-2xl rounded-xl border p-4 text-left">
+            <label className="text-foreground mb-2 block text-sm font-medium">Resume PDF</label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={handlePdfFileChange}
+              className="text-foreground block w-full text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5"
+            />
+            <p className="text-muted-foreground mt-2 text-xs">
+              {isParsingPdf
+                ? 'Extracting text from PDF...'
+                : pdfFileName
+                  ? `Loaded: ${pdfFileName}`
+                  : 'Upload a PDF resume to extract text automatically.'}
+            </p>
+            {pdfError ? <p className="mt-1 text-xs text-red-500">{pdfError}</p> : null}
+            {resume.trim() ? (
+              <textarea
+                value={resume}
+                readOnly
+                className="border-input bg-background text-foreground mt-3 h-36 w-full rounded-xl border p-3 text-left text-sm"
+              />
+            ) : null}
+          </div>
+        )}
 
         <Button
           size="lg"
           onClick={onStartCall}
-          disabled={!resume.trim()}
+          disabled={!resume.trim() || isParsingPdf}
           className="mt-6 w-64 rounded-full font-mono text-xs font-bold tracking-wider uppercase"
         >
           {startButtonText}

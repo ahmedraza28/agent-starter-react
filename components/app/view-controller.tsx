@@ -32,6 +32,8 @@ interface ViewControllerProps {
   appConfig: AppConfig;
   resume: string;
   onResumeChange: (resume: string) => void;
+  resumeInputMode: 'text' | 'pdf';
+  onResumeInputModeChange: (mode: 'text' | 'pdf') => void;
   selectedAgentName: string;
   onSelectedAgentNameChange: (agentName: string) => void;
   defaultAgentName: string;
@@ -42,6 +44,8 @@ export function ViewController({
   appConfig,
   resume,
   onResumeChange,
+  resumeInputMode,
+  onResumeInputModeChange,
   selectedAgentName,
   onSelectedAgentNameChange,
   defaultAgentName,
@@ -61,6 +65,8 @@ export function ViewController({
           onStartCall={start}
           resume={resume}
           onResumeChange={onResumeChange}
+          resumeInputMode={resumeInputMode}
+          onResumeInputModeChange={onResumeInputModeChange}
           selectedAgentName={selectedAgentName}
           onSelectedAgentNameChange={onSelectedAgentNameChange}
           defaultAgentName={defaultAgentName}
