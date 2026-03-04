@@ -95,13 +95,14 @@ export function getStyles(appConfig: AppConfig) {
     .join('\n');
 }
 
-function buildRoomConfig(appConfig: AppConfig, resume: string) {
-  if (!appConfig.agentName) {
+function buildRoomConfig(appConfig: AppConfig, resume: string, agentName?: string) {
+  const dispatchAgentName = agentName ?? appConfig.agentName;
+  if (!dispatchAgentName) {
     return undefined;
   }
 
   const agentDispatch: AgentDispatchConfig = {
-    agent_name: appConfig.agentName,
+    agent_name: dispatchAgentName,
   };
   const trimmedResume = resume.trim();
   if (trimmedResume) {
@@ -140,11 +141,11 @@ async function fetchConnectionDetails(
  * @param appConfig - The app configuration
  * @returns A token source for a sandboxed LiveKit session
  */
-export function getSandboxTokenSource(appConfig: AppConfig, resume: string) {
+export function getSandboxTokenSource(appConfig: AppConfig, resume: string, agentName?: string) {
   return TokenSource.custom(async () => {
     const url = new URL(process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT!, window.location.origin);
     const sandboxId = appConfig.sandboxId ?? '';
-    const roomConfig = buildRoomConfig(appConfig, resume);
+    const roomConfig = buildRoomConfig(appConfig, resume, agentName);
 
     try {
       return await fetchConnectionDetails(
@@ -159,9 +160,9 @@ export function getSandboxTokenSource(appConfig: AppConfig, resume: string) {
   });
 }
 
-export function getEndpointTokenSource(appConfig: AppConfig, resume: string) {
+export function getEndpointTokenSource(appConfig: AppConfig, resume: string, agentName?: string) {
   return TokenSource.custom(async () => {
-    const roomConfig = buildRoomConfig(appConfig, resume);
+    const roomConfig = buildRoomConfig(appConfig, resume, agentName);
     try {
       return await fetchConnectionDetails('/api/token', {}, roomConfig);
     } catch (error) {

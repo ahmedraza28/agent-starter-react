@@ -32,9 +32,21 @@ interface ViewControllerProps {
   appConfig: AppConfig;
   resume: string;
   onResumeChange: (resume: string) => void;
+  selectedAgentName: string;
+  onSelectedAgentNameChange: (agentName: string) => void;
+  defaultAgentName: string;
+  dynamicAgentName: string;
 }
 
-export function ViewController({ appConfig, resume, onResumeChange }: ViewControllerProps) {
+export function ViewController({
+  appConfig,
+  resume,
+  onResumeChange,
+  selectedAgentName,
+  onSelectedAgentNameChange,
+  defaultAgentName,
+  dynamicAgentName,
+}: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const { resolvedTheme } = useTheme();
 
@@ -49,6 +61,10 @@ export function ViewController({ appConfig, resume, onResumeChange }: ViewContro
           onStartCall={start}
           resume={resume}
           onResumeChange={onResumeChange}
+          selectedAgentName={selectedAgentName}
+          onSelectedAgentNameChange={onSelectedAgentNameChange}
+          defaultAgentName={defaultAgentName}
+          dynamicAgentName={dynamicAgentName}
         />
       )}
       {/* Session view */}

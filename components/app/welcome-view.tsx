@@ -1,4 +1,11 @@
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 function WelcomeImage() {
   return (
@@ -23,6 +30,10 @@ interface WelcomeViewProps {
   onStartCall: () => void;
   resume: string;
   onResumeChange: (resume: string) => void;
+  selectedAgentName: string;
+  onSelectedAgentNameChange: (agentName: string) => void;
+  defaultAgentName: string;
+  dynamicAgentName: string;
 }
 
 export const WelcomeView = ({
@@ -30,6 +41,10 @@ export const WelcomeView = ({
   onStartCall,
   resume,
   onResumeChange,
+  selectedAgentName,
+  onSelectedAgentNameChange,
+  defaultAgentName,
+  dynamicAgentName,
   ref,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
   return (
@@ -40,6 +55,19 @@ export const WelcomeView = ({
         <p className="text-foreground max-w-prose pt-1 leading-6 font-medium">
           Chat live with your voice AI agent
         </p>
+
+        <div className="mt-6 w-full max-w-2xl text-left">
+          <label className="text-foreground mb-2 block text-sm font-medium">Choose agent</label>
+          <Select value={selectedAgentName} onValueChange={onSelectedAgentNameChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select an agent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={defaultAgentName}>Without dynamic agent</SelectItem>
+              <SelectItem value={dynamicAgentName}>Dynamic agent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <textarea
           value={resume}
