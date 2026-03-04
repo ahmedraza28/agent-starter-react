@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ObjectId, type Db } from 'mongodb';
+import { type Db, ObjectId } from 'mongodb';
 import { getMongoDb } from '@/lib/mongodb';
 
 export const runtime = 'nodejs';
@@ -227,12 +227,9 @@ export async function GET(req: Request) {
           agentName: doc.agentName ?? null,
           promptProfile: doc.promptProfile ?? null,
           resumeSource: resumeSource ?? null,
-          resumePreview:
-            typeof resumeContent === 'string' ? resumeContent.slice(0, 180) : '',
-          transcriptCount:
-            typeof doc.transcriptCount === 'number' ? doc.transcriptCount : 0,
-          transcriptPreview:
-            typeof transcriptText === 'string' ? transcriptText.slice(0, 240) : '',
+          resumePreview: typeof resumeContent === 'string' ? resumeContent.slice(0, 180) : '',
+          transcriptCount: typeof doc.transcriptCount === 'number' ? doc.transcriptCount : 0,
+          transcriptPreview: typeof transcriptText === 'string' ? transcriptText.slice(0, 240) : '',
           startedAt: doc.startedAt ?? null,
           endedAt: doc.endedAt ?? null,
           createdAt: doc.createdAt ?? null,
@@ -241,10 +238,7 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error('Failed to fetch candidate conversations:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch candidate conversations' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch candidate conversations' }, { status: 500 });
   }
 }
 

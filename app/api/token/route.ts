@@ -13,15 +13,122 @@ type ConnectionDetails = {
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
+const TOKEN_ENDPOINT_ALLOWED_ORIGINS = process.env.TOKEN_ENDPOINT_ALLOWED_ORIGINS ?? '';
+const TOKEN_ENDPOINT_RATE_LIMIT = Number.parseInt(
+  process.env.TOKEN_ENDPOINT_RATE_LIMIT ?? '60',
+  10
+);
+const TOKEN_ENDPOINT_RATE_LIMIT_WINDOW_MS = Number.parseInt(
+  process.env.TOKEN_ENDPOINT_RATE_LIMIT_WINDOW_MS ?? '60000',
+  10
+);
 
 // don't cache the results
 export const revalidate = 0;
 
+type RateLimitState = {
+  count: number;
+  resetAt: number;
+};
+
+const globalForRateLimit = globalThis as typeof globalThis & {
+  tokenEndpointRateLimitStore?: Map<string, RateLimitState>;
+};
+
+const tokenEndpointRateLimitStore =
+  globalForRateLimit.tokenEndpointRateLimitStore ?? new Map<string, RateLimitState>();
+globalForRateLimit.tokenEndpointRateLimitStore = tokenEndpointRateLimitStore;
+
+function getAllowedOrigins() {
+  return new Set(
+    TOKEN_ENDPOINT_ALLOWED_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  );
+}
+
+function getClientIp(req: Request) {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() ?? 'unknown';
+  }
+
+  return req.headers.get('x-real-ip') ?? req.headers.get('cf-connecting-ip') ?? 'unknown';
+}
+
+function isAllowedOrigin(req: Request) {
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.size === 0) {
+    return {
+      ok: false as const,
+      error:
+        'TOKEN_ENDPOINT_ALLOWED_ORIGINS is not configured. Set it to your app domain(s), comma-separated.',
+      status: 500,
+    };
+  }
+
+  const originHeader = req.headers.get('origin');
+  if (!originHeader) {
+    return { ok: false as const, error: 'Missing Origin header', status: 403 };
+  }
+
+  let requestOrigin: string;
+  try {
+    requestOrigin = new URL(originHeader).origin;
+  } catch {
+    return { ok: false as const, error: 'Invalid Origin header', status: 403 };
+  }
+
+  if (!allowedOrigins.has(requestOrigin)) {
+    return { ok: false as const, error: 'Origin not allowed', status: 403 };
+  }
+
+  return { ok: true as const };
+}
+
+function isRateLimited(req: Request) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const current = tokenEndpointRateLimitStore.get(ip);
+
+  if (!current || current.resetAt <= now) {
+    tokenEndpointRateLimitStore.set(ip, {
+      count: 1,
+      resetAt: now + TOKEN_ENDPOINT_RATE_LIMIT_WINDOW_MS,
+    });
+    return false;
+  }
+
+  if (current.count >= TOKEN_ENDPOINT_RATE_LIMIT) {
+    return true;
+  }
+
+  current.count += 1;
+  tokenEndpointRateLimitStore.set(ip, current);
+  return false;
+}
+
+function enforceProductionGuards(req: Request) {
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
+
+  const originCheck = isAllowedOrigin(req);
+  if (!originCheck.ok) {
+    return NextResponse.json({ error: originCheck.error }, { status: originCheck.status });
+  }
+
+  if (isRateLimited(req)) {
+    return NextResponse.json({ error: 'Too many token requests' }, { status: 429 });
+  }
+
+  return null;
+}
+
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV !== 'development') {
-    throw new Error(
-      'THIS API ROUTE IS INSECURE. DO NOT USE THIS ROUTE IN PRODUCTION WITHOUT AN AUTHENTICATION LAYER.'
-    );
+  const guardResponse = enforceProductionGuards(req);
+  if (guardResponse) {
+    return guardResponse;
   }
 
   try {
@@ -67,6 +174,8 @@ export async function POST(req: Request) {
       console.error(error);
       return new NextResponse(error.message, { status: 500 });
     }
+
+    return new NextResponse('Unknown error while issuing token', { status: 500 });
   }
 }
 

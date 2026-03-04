@@ -114,8 +114,7 @@ export function App({ appConfig }: AppProps) {
     transcriptPersistedRef.current = true;
 
     const liveTranscript = serializeTranscript(messages as SessionMessageLike[]);
-    const transcript =
-      liveTranscript.length > 0 ? liveTranscript : latestTranscriptRef.current;
+    const transcript = liveTranscript.length > 0 ? liveTranscript : latestTranscriptRef.current;
 
     void fetch('/api/conversations', {
       method: 'POST',
