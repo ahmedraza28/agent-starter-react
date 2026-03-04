@@ -190,7 +190,7 @@ export function AgentSessionView_01({
   };
 
   useEffect(() => {
-    const lastMessage = messages.at(-1);
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1] : undefined;
     const lastMessageIsLocal = lastMessage?.from?.isLocal === true;
 
     if (scrollAreaRef.current && lastMessageIsLocal) {

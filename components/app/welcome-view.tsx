@@ -8,6 +8,104 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+type PromiseWithResolversResult<T> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type PromiseWithResolversFactory = {
+  withResolvers?: <T>() => PromiseWithResolversResult<T>;
+};
+
+const atPolyfill = function at<T>(this: { length: number; [index: number]: T }, index: number) {
+  const integerIndex = Number.isInteger(index) ? index : Math.trunc(index);
+  const normalizedIndex = integerIndex >= 0 ? integerIndex : this.length + integerIndex;
+
+  if (normalizedIndex < 0 || normalizedIndex >= this.length) {
+    return undefined;
+  }
+
+  return this[normalizedIndex];
+};
+
+function ensureAtCompatibility() {
+  const prototypes: object[] = [
+    Array.prototype,
+    String.prototype,
+    Int8Array.prototype,
+    Uint8Array.prototype,
+    Uint8ClampedArray.prototype,
+    Int16Array.prototype,
+    Uint16Array.prototype,
+    Int32Array.prototype,
+    Uint32Array.prototype,
+    Float32Array.prototype,
+    Float64Array.prototype,
+  ];
+
+  if (typeof BigInt64Array !== 'undefined') {
+    prototypes.push(BigInt64Array.prototype);
+  }
+  if (typeof BigUint64Array !== 'undefined') {
+    prototypes.push(BigUint64Array.prototype);
+  }
+
+  for (const prototype of prototypes) {
+    const prototypeWithAt = prototype as { at?: unknown };
+    if (typeof prototypeWithAt.at !== 'function') {
+      Object.defineProperty(prototype, 'at', {
+        value: atPolyfill,
+        configurable: true,
+        writable: true,
+      });
+    }
+  }
+}
+
+function ensurePromiseWithResolversCompatibility() {
+  const PromiseConstructor = Promise as unknown as PromiseWithResolversFactory;
+  if (typeof PromiseConstructor.withResolvers === 'function') {
+    return;
+  }
+
+  PromiseConstructor.withResolvers = <T,>() => {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((resolveFn, rejectFn) => {
+      resolve = resolveFn;
+      reject = rejectFn;
+    });
+
+    return { promise, resolve, reject };
+  };
+}
+
+function ensurePdfParsingBrowserCompatibility() {
+  ensureAtCompatibility();
+  ensurePromiseWithResolversCompatibility();
+}
+
+async function readFileAsUint8Array(file: File): Promise<Uint8Array> {
+  if (typeof file.arrayBuffer === 'function') {
+    return new Uint8Array(await file.arrayBuffer());
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (!reader.result || typeof reader.result === 'string') {
+        reject(new Error('Failed to read file data.'));
+        return;
+      }
+
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file data.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 function WelcomeImage() {
   return (
     <svg
@@ -64,7 +162,10 @@ export const WelcomeView = ({
       return;
     }
 
-    if (file.type !== 'application/pdf') {
+    const isPdfMimeType = file.type === 'application/pdf' || file.type === 'application/x-pdf';
+    const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
+
+    if (!isPdfMimeType && !hasPdfExtension) {
       setPdfError('Please upload a valid PDF file.');
       return;
     }
@@ -74,13 +175,15 @@ export const WelcomeView = ({
     setPdfFileName(file.name);
 
     try {
+      ensurePdfParsingBrowserCompatibility();
+
       const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
       pdfjs.GlobalWorkerOptions.workerSrc = new URL(
         'pdfjs-dist/build/pdf.worker.min.mjs',
         import.meta.url
       ).toString();
 
-      const data = new Uint8Array(await file.arrayBuffer());
+      const data = await readFileAsUint8Array(file);
       const loadingTask = pdfjs.getDocument({ data });
       const pdf = await loadingTask.promise;
       const pageTexts: string[] = [];
