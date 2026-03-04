@@ -24,15 +24,17 @@ const VIEW_MOTION_PROPS = {
   exit: 'hidden',
   transition: {
     duration: 0.5,
-    ease: 'linear',
+    ease: 'linear' as const,
   },
 };
 
 interface ViewControllerProps {
   appConfig: AppConfig;
+  resume: string;
+  onResumeChange: (resume: string) => void;
 }
 
-export function ViewController({ appConfig }: ViewControllerProps) {
+export function ViewController({ appConfig, resume, onResumeChange }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const { resolvedTheme } = useTheme();
 
@@ -45,6 +47,8 @@ export function ViewController({ appConfig }: ViewControllerProps) {
           {...VIEW_MOTION_PROPS}
           startButtonText={appConfig.startButtonText}
           onStartCall={start}
+          resume={resume}
+          onResumeChange={onResumeChange}
         />
       )}
       {/* Session view */}

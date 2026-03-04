@@ -14,6 +14,11 @@ export interface SandboxConfig {
     | null;
 }
 
+interface AgentDispatchConfig {
+  agent_name: string;
+  metadata?: string;
+}
+
 /**
  * Get the app configuration
  * @param headers - The headers of the request
@@ -90,33 +95,75 @@ export function getStyles(appConfig: AppConfig) {
     .join('\n');
 }
 
+function buildRoomConfig(appConfig: AppConfig, resume: string) {
+  if (!appConfig.agentName) {
+    return undefined;
+  }
+
+  const agentDispatch: AgentDispatchConfig = {
+    agent_name: appConfig.agentName,
+  };
+  const trimmedResume = resume.trim();
+  if (trimmedResume) {
+    agentDispatch.metadata = JSON.stringify({ resume: trimmedResume });
+  }
+
+  return {
+    agents: [agentDispatch],
+  };
+}
+
+async function fetchConnectionDetails(
+  endpoint: string,
+  headers: Record<string, string>,
+  roomConfig: ReturnType<typeof buildRoomConfig>
+) {
+  const payload = roomConfig ? { room_config: roomConfig } : {};
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Token endpoint failed with status ${res.status}`);
+  }
+
+  return await res.json();
+}
+
 /**
  * Get a token source for a sandboxed LiveKit session
  * @param appConfig - The app configuration
  * @returns A token source for a sandboxed LiveKit session
  */
-export function getSandboxTokenSource(appConfig: AppConfig) {
+export function getSandboxTokenSource(appConfig: AppConfig, resume: string) {
   return TokenSource.custom(async () => {
     const url = new URL(process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT!, window.location.origin);
     const sandboxId = appConfig.sandboxId ?? '';
-    const roomConfig = appConfig.agentName
-      ? {
-          agents: [{ agent_name: appConfig.agentName }],
-        }
-      : undefined;
+    const roomConfig = buildRoomConfig(appConfig, resume);
 
     try {
-      const res = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Sandbox-Id': sandboxId,
-        },
-        body: JSON.stringify({
-          room_config: roomConfig,
-        }),
-      });
-      return await res.json();
+      return await fetchConnectionDetails(
+        url.toString(),
+        { 'X-Sandbox-Id': sandboxId },
+        roomConfig
+      );
+    } catch (error) {
+      console.error('Error fetching connection details:', error);
+      throw new Error('Error fetching connection details!');
+    }
+  });
+}
+
+export function getEndpointTokenSource(appConfig: AppConfig, resume: string) {
+  return TokenSource.custom(async () => {
+    const roomConfig = buildRoomConfig(appConfig, resume);
+    try {
+      return await fetchConnectionDetails('/api/token', {}, roomConfig);
     } catch (error) {
       console.error('Error fetching connection details:', error);
       throw new Error('Error fetching connection details!');

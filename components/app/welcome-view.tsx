@@ -21,11 +21,15 @@ function WelcomeImage() {
 interface WelcomeViewProps {
   startButtonText: string;
   onStartCall: () => void;
+  resume: string;
+  onResumeChange: (resume: string) => void;
 }
 
 export const WelcomeView = ({
   startButtonText,
   onStartCall,
+  resume,
+  onResumeChange,
   ref,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
   return (
@@ -37,9 +41,17 @@ export const WelcomeView = ({
           Chat live with your voice AI agent
         </p>
 
+        <textarea
+          value={resume}
+          onChange={(event) => onResumeChange(event.target.value)}
+          placeholder="Paste candidate resume here..."
+          className="border-input bg-background text-foreground mt-6 h-36 w-full max-w-2xl rounded-xl border p-3 text-left text-sm focus:outline-none"
+        />
+
         <Button
           size="lg"
           onClick={onStartCall}
+          disabled={!resume.trim()}
           className="mt-6 w-64 rounded-full font-mono text-xs font-bold tracking-wider uppercase"
         >
           {startButtonText}
