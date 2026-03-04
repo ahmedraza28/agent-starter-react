@@ -3,7 +3,7 @@ services:
     name: agent-starter-react
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npx -y pnpm@9.15.9 install --frozen-lockfile && npx -y pnpm@9.15.9 run build
     startCommand: npm run start
     envVars:
       - key: LIVEKIT_URL
@@ -23,6 +23,6 @@ services:
       - key: TOKEN_ENDPOINT_ALLOWED_ORIGINS
         sync: false
       - key: TOKEN_ENDPOINT_RATE_LIMIT
-        value: "60"
+        value: '60'
       - key: TOKEN_ENDPOINT_RATE_LIMIT_WINDOW_MS
-        value: "60000"
+        value: '60000'
