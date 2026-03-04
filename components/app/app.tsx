@@ -63,22 +63,22 @@ function serializeTranscript(messages: SessionMessageLike[]) {
 export function App({ appConfig }: AppProps) {
   const [resume, setResume] = useState('');
   const [resumeInputMode, setResumeInputMode] = useState<ResumeInputMode>('text');
-  const dispatchAgentName =
+  const configuredDefaultAgentName =
     process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? appConfig.agentName ?? 'my-agent';
-  const defaultAgentName = process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? dispatchAgentName;
+  const defaultAgentName = process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? configuredDefaultAgentName;
   const dynamicAgentName = process.env.NEXT_PUBLIC_DYNAMIC_AGENT_NAME ?? 'dynamic-agent';
-  const [selectedAgentName, setSelectedAgentName] = useState(defaultAgentName);
+  const [selectedAgentName, setSelectedAgentName] = useState(configuredDefaultAgentName);
   const selectedPromptProfile = selectedAgentName === dynamicAgentName ? 'dynamic' : 'main';
 
   const tokenSource = useMemo(() => {
     return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
-      ? getSandboxTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile)
-      : getEndpointTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile);
-  }, [appConfig, resume, dispatchAgentName, selectedPromptProfile]);
+      ? getSandboxTokenSource(appConfig, resume, selectedAgentName, selectedPromptProfile)
+      : getEndpointTokenSource(appConfig, resume, selectedAgentName, selectedPromptProfile);
+  }, [appConfig, resume, selectedAgentName, selectedPromptProfile]);
 
   const session = useSession(
     tokenSource,
-    dispatchAgentName ? { agentName: dispatchAgentName } : undefined
+    selectedAgentName ? { agentName: selectedAgentName } : undefined
   );
   const { messages } = useSessionMessages(session);
   const callActiveRef = useRef(false);
@@ -123,7 +123,7 @@ export function App({ appConfig }: AppProps) {
       },
       body: JSON.stringify({
         roomName: roomNameRef.current,
-        agentName: dispatchAgentName,
+        agentName: selectedAgentName,
         promptProfile: selectedPromptProfile,
         resume,
         resumeSource: resumeInputMode,
@@ -134,10 +134,10 @@ export function App({ appConfig }: AppProps) {
       console.error('Failed to persist conversation:', error);
     });
   }, [
-    dispatchAgentName,
     messages,
     resume,
     resumeInputMode,
+    selectedAgentName,
     selectedPromptProfile,
     session.isConnected,
     session.room.name,

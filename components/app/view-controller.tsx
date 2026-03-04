@@ -1,7 +1,9 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
+import { toast } from 'sonner';
 import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
@@ -53,6 +55,20 @@ export function ViewController({
 }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const { resolvedTheme } = useTheme();
+  const handleStartCall = useCallback(async () => {
+    try {
+      await start();
+    } catch (error) {
+      console.error('Failed to start call:', error);
+      const rawMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isPermissionIssue = /permission|notallowed|denied|microphone|camera/i.test(rawMessage);
+      const description = isPermissionIssue
+        ? 'Microphone or camera permission is blocked in your browser settings.'
+        : rawMessage;
+
+      toast.error('Failed to start call', { description });
+    }
+  }, [start]);
 
   return (
     <AnimatePresence mode="wait">
@@ -62,7 +78,7 @@ export function ViewController({
           key="welcome"
           {...VIEW_MOTION_PROPS}
           startButtonText={appConfig.startButtonText}
-          onStartCall={start}
+          onStartCall={handleStartCall}
           resume={resume}
           onResumeChange={onResumeChange}
           resumeInputMode={resumeInputMode}

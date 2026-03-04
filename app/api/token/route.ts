@@ -47,6 +47,34 @@ function getAllowedOrigins() {
   );
 }
 
+function getRequestOrigins(req: Request) {
+  const origins = new Set<string>();
+
+  try {
+    origins.add(new URL(req.url).origin);
+  } catch {
+    // Ignore malformed request URLs and rely on forwarded headers.
+  }
+
+  const forwardedHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+  if (!forwardedHost) {
+    return origins;
+  }
+
+  const host = forwardedHost.split(',')[0]?.trim();
+  if (!host) {
+    return origins;
+  }
+
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const inferredProto =
+    host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
+  const proto = forwardedProto || inferredProto;
+  origins.add(`${proto}://${host}`);
+
+  return origins;
+}
+
 function getClientIp(req: Request) {
   const forwardedFor = req.headers.get('x-forwarded-for');
   if (forwardedFor) {
@@ -57,16 +85,6 @@ function getClientIp(req: Request) {
 }
 
 function isAllowedOrigin(req: Request) {
-  const allowedOrigins = getAllowedOrigins();
-  if (allowedOrigins.size === 0) {
-    return {
-      ok: false as const,
-      error:
-        'TOKEN_ENDPOINT_ALLOWED_ORIGINS is not configured. Set it to your app domain(s), comma-separated.',
-      status: 500,
-    };
-  }
-
   const originHeader = req.headers.get('origin');
   if (!originHeader) {
     return { ok: false as const, error: 'Missing Origin header', status: 403 };
@@ -77,6 +95,21 @@ function isAllowedOrigin(req: Request) {
     requestOrigin = new URL(originHeader).origin;
   } catch {
     return { ok: false as const, error: 'Invalid Origin header', status: 403 };
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.size === 0) {
+    // Fall back to same-origin checks in production when explicit allowlist is not configured.
+    const requestOrigins = getRequestOrigins(req);
+    if (requestOrigins.has(requestOrigin)) {
+      return { ok: true as const };
+    }
+    return {
+      ok: false as const,
+      error:
+        'TOKEN_ENDPOINT_ALLOWED_ORIGINS is not configured, and request origin does not match this host.',
+      status: 403,
+    };
   }
 
   if (!allowedOrigins.has(requestOrigin)) {
