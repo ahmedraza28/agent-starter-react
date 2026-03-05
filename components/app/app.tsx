@@ -67,18 +67,19 @@ export function App({ appConfig }: AppProps) {
     process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? appConfig.agentName ?? 'my-agent';
   const defaultAgentName = process.env.NEXT_PUBLIC_DEFAULT_AGENT_NAME ?? configuredDefaultAgentName;
   const dynamicAgentName = process.env.NEXT_PUBLIC_DYNAMIC_AGENT_NAME ?? 'dynamic-agent';
+  const dispatchAgentName = configuredDefaultAgentName;
   const [selectedAgentName, setSelectedAgentName] = useState(configuredDefaultAgentName);
   const selectedPromptProfile = selectedAgentName === dynamicAgentName ? 'dynamic' : 'main';
 
   const tokenSource = useMemo(() => {
     return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
-      ? getSandboxTokenSource(appConfig, resume, selectedAgentName, selectedPromptProfile)
-      : getEndpointTokenSource(appConfig, resume, selectedAgentName, selectedPromptProfile);
-  }, [appConfig, resume, selectedAgentName, selectedPromptProfile]);
+      ? getSandboxTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile)
+      : getEndpointTokenSource(appConfig, resume, dispatchAgentName, selectedPromptProfile);
+  }, [appConfig, dispatchAgentName, resume, selectedPromptProfile]);
 
   const session = useSession(
     tokenSource,
-    selectedAgentName ? { agentName: selectedAgentName } : undefined
+    dispatchAgentName ? { agentName: dispatchAgentName } : undefined
   );
   const { messages } = useSessionMessages(session);
   const callActiveRef = useRef(false);
